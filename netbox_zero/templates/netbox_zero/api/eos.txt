@@ -1,0 +1,64 @@
+!
+transceiver qsfp default-mode 4x10G
+!
+service routing protocols model multi-agent
+!
+logging vrf CC-MGMT host 147.204.35.213 514
+logging vrf OOB host 10.17.120.130 514
+logging vrf OOB host 147.204.35.213 514
+logging vrf OOB source-interface Management1
+!
+hostname {{name}}
+dns domain cc.qa-de-6.cloud.sap
+!
+{% for ntp_ip in ntp_servers %}ntp server {{ntp_ip}} source Management1
+{%endfor%}
+ntp server 147.204.9.202 source Loopback900
+ntp server 147.204.9.203 source Loopback900
+ntp server 147.204.9.204 source Loopback900
+!
+snmp-server vrf CC-MGMT local-interface Loopback900
+snmp-server vrf OOB local-interface Management1
+snmp-server vrf CC-MGMT
+snmp-server vrf OOB
+!
+spanning-tree mode mstp
+!
+aaa authorization exec default local
+!
+no aaa root
+!
+username admin privilege 15 role network-admin secret sha512 $6$CBVb5S4KGt2ltDnK$pzvM73QTGwVyBIlJtBpOTLMBSxIYHZ0dxEfqDjZPj9QVMLolxW3NQp6iAKZOs2lj8zUmonIVegsgtnxZoMbjZ1
+!
+clock timezone GMT
+!
+!{% for interface in interface_set %}{% if interface.primary_vrf is not None %}
+vrf instance {{interface.primary_vrf}}
+!{%endif%}{%endfor%}
+!
+!{% for interface in interface_set %}{% if interface.primary_ip is not None %}
+interface {{interface.name}}
+{% if interface.primary_vrf is not None %}vrf {{interface.primary_vrf}}{%endif%}
+ip address  {{interface.primary_ip}}
+
+!
+{%endif%}{%endfor%}
+
+interface Vxlan1
+vxlan source-interface Loopback0
+vxlan udp-port 4789
+vxlan vrf CC-MGMT vni 1900
+!
+ip routing ipv6 interfaces
+ip routing vrf CC-MGMT
+no ip routing vrf OOB
+!
+ipv6 unicast-routing
+!{% for interface in interface_set %}{% if interface.primary_ip is not None and  interface.primary_vrf is not None and interface.primary_vrf == "CC-MGMT" %}
+ip route vrf {{interface.primary_vrf}} 0.0.0.0/0 {{interface.router}}
+!{%endif%}{%endfor%}
+ip radius source-interface Management1
+!
+management api http-commands
+no shutdown
+!
